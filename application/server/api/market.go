@@ -21,8 +21,31 @@ func NewMarketHandler() *MarketHandler {
 func (h *MarketHandler) ListListings(c *gin.Context) {
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
 	size, _ := strconv.Atoi(c.DefaultQuery("pageSize", "10"))
+	quality := c.Query("quality")
+	wear := c.Query("wear")
+	category := c.Query("category")
+	title := c.Query("title")
+	sort := c.DefaultQuery("sort", "newest") // newest|priceAsc|priceDesc
 
-	items, total, err := h.svc.ListListings(page, size)
+	var minPricePtr, maxPricePtr *int64
+	if v := c.Query("minPrice"); v != "" {
+		if n, err := strconv.ParseInt(v, 10, 64); err == nil {
+			minPricePtr = &n
+		} else {
+			utils.BadRequest(c, "minPrice 必须为整数")
+			return
+		}
+	}
+	if v := c.Query("maxPrice"); v != "" {
+		if n, err := strconv.ParseInt(v, 10, 64); err == nil {
+			maxPricePtr = &n
+		} else {
+			utils.BadRequest(c, "maxPrice 必须为整数")
+			return
+		}
+	}
+
+	items, total, err := h.svc.ListListings(page, size, quality, wear, category, title, minPricePtr, maxPricePtr, sort)
 	if err != nil {
 		utils.ServerError(c, "查询失败："+err.Error())
 		return

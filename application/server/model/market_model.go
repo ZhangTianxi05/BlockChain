@@ -26,6 +26,10 @@ type MarketListing struct {
 	ReservePrice  *int64 `json:"reservePrice"` // 低于此价不能成交（可选）
 	BuyNowPrice   *int64 `json:"buyNowPrice"`  // 一口价（可选）
 	WinnerOfferID *int   `json:"winnerOfferId" gorm:"index"`
+	Quality       string `json:"quality" gorm:"index"`
+	Wear          string `json:"wear" gorm:"index"`
+	Category      string `json:"category" gorm:"index"`
+	WearValue     string `json:"wearValue" gorm:"type:varchar(32)"`
 }
 
 func (MarketListing) TableName() string { return "market_listings" }

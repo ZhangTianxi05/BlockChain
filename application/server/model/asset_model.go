@@ -13,6 +13,10 @@ type Asset struct {
 	AuthorId    int       `json:"authorId"`
 	OwnerId     int       `json:"ownerId"`
 	Description string    `json:"description"`
+	Quality     string    `json:"quality"`
+	Wear        string    `json:"wear"`
+	Category    string    `json:"category"`   // 新增：枪械种类
+	WearValue   string    `json:"wearValue"`  // 新增：磨损度值(0~1)，字符串存储避免精度问题
 	TimeStamp   time.Time `json:"timeStamp"`
 }
 

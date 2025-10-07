@@ -48,116 +48,126 @@ func main() {
 	r.Static("/public", "./public")
 
 	apiGroup := r.Group("/api")
-
-	// 注册路由
-	accountHandler := api.NewAccountHandler()
-	walletHandler := api.NewWalletHandler()
-	assetHandler := api.NewAssetHandler()
-	chatHandler, err := api.NewChatHandler()
-	marketHandler := api.NewMarketHandler()
-	auctionHandler := api.NewAuctionHandler()
-
-	if err != nil {
-		log.Fatalf("创建聊天处理程序失败：%v", err)
-	}
-
-	// 创建JWT中间件
-	jwtMiddleware, err := middleware.NewJWTMiddleware()
-	if err != nil {
-		log.Fatalf("创建JWT中间件失败：%v", err)
-	}
-
-	// 账号相关接口（无需认证）
-	account := apiGroup.Group("/account")
 	{
-		// 用户注册
-		account.POST("/register", accountHandler.Register)
-		// 用户登录
-		account.POST("/login", accountHandler.Login)
-		// 用户登出
-		account.POST("/logout", accountHandler.Logout)
-	}
+		// 注册路由
+		accountHandler := api.NewAccountHandler()
+		walletHandler := api.NewWalletHandler()
+		assetHandler := api.NewAssetHandler()
+		chatHandler, err := api.NewChatHandler()
+		marketHandler := api.NewMarketHandler()
+		auctionHandler := api.NewAuctionHandler()
 
-	// 需要认证的账号接口
-	authAccount := apiGroup.Group("/account").Use(jwtMiddleware.Auth())
-	{
-		// 获取用户信息
-		authAccount.GET("/profile", accountHandler.GetProfile)
-		// 更新用户信息
-		authAccount.PUT("/profile", accountHandler.UpdateProfile)
-		// 获取头像
-		authAccount.GET("/avatar", accountHandler.GetAvatar)
-		// 更新头像
-		authAccount.PUT("/avatar", accountHandler.UpdateAvatar)
-		// 更新组织接口
-		authAccount.PUT("/org", accountHandler.UpdateOrg)
-		// 获取用户名
-		authAccount.GET("/userName", accountHandler.GetUserNameById)
-	}
+		if err != nil {
+			log.Fatalf("创建聊天处理程序失败：%v", err)
+		}
 
-	// 钱包相关接口
-	wallet := apiGroup.Group("/wallet").Use(jwtMiddleware.Auth())
-	{
-		wallet.POST("/create", walletHandler.CreateAccount)
-		wallet.GET("/balance", walletHandler.GetBalance)
-		wallet.POST("/transfer", walletHandler.Transfer)
-		wallet.POST("/mintToken", walletHandler.MintToken)
-		wallet.GET("/transferBySenderID", walletHandler.GetTransferBySenderID)
-		wallet.GET("/transferByRecipientID", walletHandler.GetTransferByRecipientID)
-		wallet.POST("/withHoldAccount", walletHandler.WithHoldAccount)
-		wallet.GET("/getWithHoldingByAccountID", walletHandler.GetWithHoldingByAccountID)
-		wallet.GET("/getWithHoldingByListingID", walletHandler.GetWithHoldingByListingID)
-		wallet.POST("/clearWithHolding", walletHandler.ClearWithHolding)
-	}
+		// 创建JWT中间件
+		jwtMiddleware, err := middleware.NewJWTMiddleware()
+		if err != nil {
+			log.Fatalf("创建JWT中间件失败：%v", err)
+		}
 
-	// 资产相关接口
-	asset := apiGroup.Group("/asset").Use(jwtMiddleware.Auth())
-	{
-		asset.POST("/create", assetHandler.CreateAsset)
-		asset.GET("/getAssetByID", assetHandler.GetAssetByID)
-		asset.GET("/getAssetByAuthorID", assetHandler.GetAssetByAuthorID)
-		asset.GET("/getAssetByOwnerID", assetHandler.GetAssetByOwnerID)
-		asset.POST("/transfer", assetHandler.TransferAsset)
-		asset.GET("/getStatus", assetHandler.GetAssetStatus)
-	}
+		// 账号相关接口（无需认证）
+		account := apiGroup.Group("/account")
+		{
+			// 用户注册
+			account.POST("/register", accountHandler.Register)
+			// 用户登录
+			account.POST("/login", accountHandler.Login)
+			// 用户登出
+			account.POST("/logout", accountHandler.Logout)
+		}
 
-	// 聊天相关接口（无需认证），主要是因为websocket
-	chat := apiGroup.Group("/chat")
-	{
-		chat.GET("/ws", chatHandler.SendMessage)
-	}
+		// 需要认证的账号接口
+		authAccount := apiGroup.Group("/account").Use(jwtMiddleware.Auth())
+		{
+			// 获取用户信息
+			authAccount.GET("/profile", accountHandler.GetProfile)
+			// 更新用户信息
+			authAccount.PUT("/profile", accountHandler.UpdateProfile)
+			// 获取头像
+			authAccount.GET("/avatar", accountHandler.GetAvatar)
+			// 更新头像
+			authAccount.PUT("/avatar", accountHandler.UpdateAvatar)
+			// 更新组织接口
+			authAccount.PUT("/org", accountHandler.UpdateOrg)
+			// 获取用户名
+			authAccount.GET("/userName", accountHandler.GetUserNameById)
+		}
 
-	// 需要认证的聊天接口
-	authChat := apiGroup.Group("/chat").Use(jwtMiddleware.Auth())
-	{
-		authChat.GET("/getChatSession", chatHandler.GetChatSession)
-		authChat.GET("/getMessages", chatHandler.GetMessages)
-		authChat.POST("/readMessages", chatHandler.ReadMessages)
-		authChat.GET("/getUnreadMessageCount", chatHandler.GetUnreadMessageCount)
-	}
+		// 钱包相关接口
+		wallet := apiGroup.Group("/wallet").Use(jwtMiddleware.Auth())
+		{
+			wallet.POST("/create", walletHandler.CreateAccount)
+			wallet.GET("/balance", walletHandler.GetBalance)
+			wallet.POST("/transfer", walletHandler.Transfer)
+			wallet.POST("/mintToken", walletHandler.MintToken)
+			wallet.GET("/transferBySenderID", walletHandler.GetTransferBySenderID)
+			wallet.GET("/transferByRecipientID", walletHandler.GetTransferByRecipientID)
+			wallet.POST("/withHoldAccount", walletHandler.WithHoldAccount)
+			wallet.GET("/getWithHoldingByAccountID", walletHandler.GetWithHoldingByAccountID)
+			wallet.GET("/getWithHoldingByListingID", walletHandler.GetWithHoldingByListingID)
+			wallet.POST("/clearWithHolding", walletHandler.ClearWithHolding)
+		}
 
-	// 市场（需要 JWT）
-	market := apiGroup.Group("/market", jwtMiddleware.Auth())
-	{
-		market.GET("/listings", marketHandler.ListListings)
-		market.POST("/listing", marketHandler.CreateListing)
-		market.POST("/offer", marketHandler.CreateOffer)
-		market.POST("/offer/:id/accept", marketHandler.AcceptOffer)
-		market.POST("/offer/:id/cancel", marketHandler.CancelOffer)
-		market.GET("/offers/mine", marketHandler.ListMyOffers)
-		market.POST("/buyNow", marketHandler.BuyNow)
-	}
+		// 资产相关接口
+		asset := apiGroup.Group("/asset").Use(jwtMiddleware.Auth())
+		{
+			asset.POST("/create", assetHandler.CreateAsset)
+			asset.GET("/getAssetByID", assetHandler.GetAssetByID)
+			asset.GET("/getAssetByAuthorID", assetHandler.GetAssetByAuthorID)
+			asset.GET("/getAssetByOwnerID", assetHandler.GetAssetByOwnerID)
+			asset.POST("/transfer", assetHandler.TransferAsset)
+			asset.GET("/getStatus", assetHandler.GetAssetStatus)
+			asset.POST("/delete", assetHandler.DeleteAsset) // 新增：删除资产
+		}
 
-	// 拍卖相关接口
-	auction := apiGroup.Group("/auction", jwtMiddleware.Auth())
-	{
-		auction.POST("/create", auctionHandler.CreateLot)
-		auction.GET("/list", auctionHandler.GetAllLots)
-		auction.GET("/seller", auctionHandler.GetLotBySellerID)
-		auction.POST("/bid", auctionHandler.SubmitBid)
-		auction.GET("/bid", auctionHandler.GetBidPrice)
-		auction.GET("/result", auctionHandler.GetAuctionResult)
-		auction.POST("/finish", auctionHandler.FinishAuction)
+		// 聊天相关接口（无需认证），主要是因为websocket
+		chat := apiGroup.Group("/chat")
+		{
+			chat.GET("/ws", chatHandler.SendMessage)
+		}
+
+		// 需要认证的聊天接口
+		authChat := apiGroup.Group("/chat").Use(jwtMiddleware.Auth())
+		{
+			authChat.GET("/getChatSession", chatHandler.GetChatSession)
+			authChat.GET("/getMessages", chatHandler.GetMessages)
+			authChat.POST("/readMessages", chatHandler.ReadMessages)
+			authChat.GET("/getUnreadMessageCount", chatHandler.GetUnreadMessageCount)
+		}
+
+		// 市场（需要 JWT）
+		market := apiGroup.Group("/market", jwtMiddleware.Auth())
+		{
+			market.GET("/listings", marketHandler.ListListings)
+			market.POST("/listing", marketHandler.CreateListing)
+			market.POST("/offer", marketHandler.CreateOffer)
+			market.POST("/offer/:id/accept", marketHandler.AcceptOffer)
+			market.POST("/offer/:id/cancel", marketHandler.CancelOffer)
+			market.GET("/offers/mine", marketHandler.ListMyOffers)
+			market.POST("/buyNow", marketHandler.BuyNow)
+		}
+
+		// 拍卖相关接口
+		auction := apiGroup.Group("/auction", jwtMiddleware.Auth())
+		{
+			auction.POST("/create", auctionHandler.CreateLot)
+			auction.GET("/list", auctionHandler.GetAllLots)
+			auction.GET("/seller", auctionHandler.GetLotBySellerID)
+			auction.POST("/bid", auctionHandler.SubmitBid)
+			auction.GET("/bid", auctionHandler.GetBidPrice)
+			auction.GET("/result", auctionHandler.GetAuctionResult)
+			auction.POST("/finish", auctionHandler.FinishAuction)
+		}
+
+		// Steam 导入
+		steamHandler := api.NewSteamHandler()
+		steam := apiGroup.Group("/steam")
+		{
+			steam.GET("/inventory", steamHandler.Inventory)                  // 预览
+			steam.POST("/import", jwtMiddleware.Auth(), steamHandler.Import) // 导入需登录
+		}
 	}
 
 	// 打印路由信息

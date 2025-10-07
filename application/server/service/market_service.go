@@ -29,8 +29,6 @@ func isPast(deadline *time.Time, now time.Time) bool {
 }
 func (s *MarketService) CreateListing(userID int, assetId, title string, price int64, deadline *time.Time) (*model.MarketListing, error) {
 	const org2 = 2
-
-	// 1) 链上校验：只有 NFT 当前 Owner 才能挂牌
 	as := NewAssetService(model.GetDB())
 	asset, err := as.GetAssetByID(assetId, org2)
 	if err != nil {
@@ -80,15 +78,24 @@ func (s *MarketService) CreateListing(userID int, assetId, title string, price i
 		SellerOrg: org2,
 		Deadline:  deadline,
 		Status:    model.ListingActive,
+		Quality:   asset.Quality,
+		Wear:      asset.Wear,
+		Category:  asset.Category,
+		WearValue: asset.WearValue,
 	}
 	if err := s.db.Create(l).Error; err != nil {
-		return nil, fmt.Errorf("保存挂牌失败：%v", err)
+		return nil, fmt.Errorf("创建挂牌失败：%v", err)
 	}
 	return l, nil
 }
 
-// 查询挂牌（保持不变）
-func (s *MarketService) ListListings(page, pageSize int) ([]model.MarketListing, int64, error) {
+// 查询挂牌（支持筛选/搜索/排序）
+func (s *MarketService) ListListings(
+	page, pageSize int,
+	quality, wear, category, title string,
+	minPrice, maxPrice *int64,
+	sort string,
+) ([]model.MarketListing, int64, error) {
 	if page <= 0 {
 		page = 1
 	}
@@ -102,12 +109,43 @@ func (s *MarketService) ListListings(page, pageSize int) ([]model.MarketListing,
 
 	q := s.db.Model(&model.MarketListing{}).
 		Where("status = ?", model.ListingActive).
-		Where("deadline IS NULL OR deadline > ?", now) // ← 新增
+		Where("deadline IS NULL OR deadline > ?", now)
+
+	if quality != "" {
+		q = q.Where("quality = ?", quality)
+	}
+	if wear != "" {
+		q = q.Where("wear = ?", wear)
+	}
+	if category != "" {
+		q = q.Where("category = ?", category)
+	}
+	if title != "" {
+		q = q.Where("title LIKE ?", "%"+title+"%")
+	}
+	if minPrice != nil {
+		q = q.Where("price >= ?", *minPrice)
+	}
+	if maxPrice != nil {
+		q = q.Where("price <= ?", *maxPrice)
+	}
 
 	if err := q.Count(&total).Error; err != nil {
 		return nil, 0, err
 	}
-	if err := q.Order("id DESC").Offset((page - 1) * pageSize).Limit(pageSize).Find(&items).Error; err != nil {
+
+	orderBy := "id DESC" // newest
+	switch sort {
+	case "priceAsc":
+		orderBy = "price ASC, id DESC"
+	case "priceDesc":
+		orderBy = "price DESC, id DESC"
+	}
+
+	if err := q.Order(orderBy).
+		Offset((page - 1) * pageSize).
+		Limit(pageSize).
+		Find(&items).Error; err != nil {
 		return nil, 0, err
 	}
 	return items, total, nil

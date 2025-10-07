@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"strconv" // 新增
 	"time"
 
 	"github.com/hyperledger/fabric-chaincode-go/v2/pkg/cid"
@@ -61,7 +62,10 @@ type Asset struct {
 	AuthorId    int       `json:"authorId"`
 	OwnerId     int       `json:"ownerId"`
 	Description string    `json:"description"`
-	Rarity      string    `json:"rarity"`
+	Quality     string    `json:"quality"`
+	Wear        string    `json:"wear"`
+	Category    string    `json:"category"`
+	WearValue   string    `json:"wearValue"`
 	TimeStamp   time.Time `json:"timeStamp"`
 }
 
@@ -469,8 +473,23 @@ func (s *SmartContract) ClearWithHolding(ctx contractapi.TransactionContextInter
 }
 
 // 创建 NFT
-func (s *SmartContract) CreateAsset(ctx contractapi.TransactionContextInterface, id string, imageName string,
-	name string, authorId int, ownerId int, description string, timeStamp time.Time) (Asset, error) {
+func (s *SmartContract) CreateAsset(ctx contractapi.TransactionContextInterface,
+	id string, imageName string, name string,
+	authorId int, ownerId int, description string, timeStamp time.Time,
+	quality string, wear string, category string, wearValue string, // 新增两个参数
+) (Asset, error) {
+	// 校验 category
+	switch category {
+	case "匕首", "手套", "步枪", "手枪", "冲锋枪", "霰弹枪", "机枪", "印花", "探员", "其他":
+		// ok
+	default:
+		return Asset{}, fmt.Errorf("非法枪械种类: %s", category)
+	}
+	// 校验 wearValue 0~1
+	if v, err := strconv.ParseFloat(wearValue, 64); err != nil || v < 0 || v > 1 {
+		return Asset{}, fmt.Errorf("磨损度值必须是 0~1 小数")
+	}
+
 	asset := Asset{
 		ID:          id,
 		ImageName:   imageName,
@@ -478,31 +497,33 @@ func (s *SmartContract) CreateAsset(ctx contractapi.TransactionContextInterface,
 		AuthorId:    authorId,
 		OwnerId:     ownerId,
 		Description: description,
+		Quality:     quality,
+		Wear:        wear,
+		Category:    category,  // 新增
+		WearValue:   wearValue, // 新增
 		TimeStamp:   timeStamp,
 	}
-	// 这里存三份，一份主键是 ID，一份主键是 AuthorId，一份主键是 OwnerId
+
+	// 这里存三份
 	key1, err := s.getCompositeKey(ctx, ASSET_KEY1, []string{id})
 	if err != nil {
 		return Asset{}, fmt.Errorf("创建复合键失败：%v", err)
 	}
-	err = s.putState(ctx, key1, asset)
-	if err != nil {
+	if err = s.putState(ctx, key1, asset); err != nil {
 		return Asset{}, fmt.Errorf("保存 NFT 失败：%v", err)
 	}
 	key2, err := s.getCompositeKey(ctx, ASSET_KEY2, []string{fmt.Sprintf("%d", authorId), id})
 	if err != nil {
 		return Asset{}, fmt.Errorf("创建复合键失败：%v", err)
 	}
-	err = s.putState(ctx, key2, asset)
-	if err != nil {
+	if err = s.putState(ctx, key2, asset); err != nil {
 		return Asset{}, fmt.Errorf("保存 NFT 失败：%v", err)
 	}
 	key3, err := s.getCompositeKey(ctx, ASSET_KEY3, []string{fmt.Sprintf("%d", ownerId), id})
 	if err != nil {
 		return Asset{}, fmt.Errorf("创建复合键失败：%v", err)
 	}
-	err = s.putState(ctx, key3, asset)
-	if err != nil {
+	if err = s.putState(ctx, key3, asset); err != nil {
 		return Asset{}, fmt.Errorf("保存 NFT 失败：%v", err)
 	}
 	return asset, nil
@@ -624,6 +645,40 @@ func (s *SmartContract) TransferAsset(ctx contractapi.TransactionContextInterfac
 	err = s.putState(ctx, key3, asset)
 	if err != nil {
 		return fmt.Errorf("保存 NFT 失败：%v", err)
+	}
+	return nil
+}
+
+// 删除 NFT（仅当前所有者）
+func (s *SmartContract) DeleteAsset(ctx contractapi.TransactionContextInterface, id string, userId int, timeStamp time.Time) error {
+	var asset Asset
+	key1, err := s.getCompositeKey(ctx, ASSET_KEY1, []string{id})
+	if err != nil {
+		return fmt.Errorf("创建复合键失败：%v", err)
+	}
+	if err = s.getState(ctx, key1, &asset); err != nil {
+		return fmt.Errorf("查询 NFT 失败：%v", err)
+	}
+	if asset.OwnerId != userId {
+		return fmt.Errorf("只有 NFT 的所有者可以删除资产")
+	}
+	// 删除三份索引：id、authorId+id、ownerId+id
+	key2, err := s.getCompositeKey(ctx, ASSET_KEY2, []string{fmt.Sprintf("%d", asset.AuthorId), id})
+	if err != nil {
+		return fmt.Errorf("创建复合键失败：%v", err)
+	}
+	key3, err := s.getCompositeKey(ctx, ASSET_KEY3, []string{fmt.Sprintf("%d", asset.OwnerId), id})
+	if err != nil {
+		return fmt.Errorf("创建复合键失败：%v", err)
+	}
+	if err = ctx.GetStub().DelState(key1); err != nil {
+		return fmt.Errorf("删除主记录失败：%v", err)
+	}
+	if err = ctx.GetStub().DelState(key2); err != nil {
+		return fmt.Errorf("删除作者索引失败：%v", err)
+	}
+	if err = ctx.GetStub().DelState(key3); err != nil {
+		return fmt.Errorf("删除所有者索引失败：%v", err)
 	}
 	return nil
 }

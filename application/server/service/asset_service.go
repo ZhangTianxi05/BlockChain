@@ -21,22 +21,34 @@ func NewAssetService(db *gorm.DB) *AssetService {
 }
 
 // 创建 nft 资产
-func (s *AssetService) CreateAsset(name string, imageName string, authorId int,
-	ownerId int, description string, org int) (model.Asset, error) {
+func (s *AssetService) CreateAsset(
+	name string, imageName string, authorId int, ownerId int,
+	description string, quality string, wear string, category string, wearValue string, org int,
+) (model.Asset, error) {
 	orgName, err := model.GetOrg(org)
 	if err != nil {
 		return model.Asset{}, fmt.Errorf("获取组织失败：%s", err)
 	}
 	contract := fabric.GetContract(orgName)
 	uid := uuid.New().String()
-	result, err := contract.SubmitTransaction("CreateAsset", uid, imageName, name, fmt.Sprintf("%d", authorId),
-		fmt.Sprintf("%d", ownerId), description, time.Now().Format(time.RFC3339))
+
+	result, err := contract.SubmitTransaction(
+		"CreateAsset",
+		uid, imageName, name,
+		fmt.Sprintf("%d", authorId),
+		fmt.Sprintf("%d", ownerId),
+		description,
+		time.Now().Format(time.RFC3339),
+		quality,
+		wear,
+		category,
+		wearValue,
+	)
 	if err != nil {
 		return model.Asset{}, fmt.Errorf("创建 NFT 失败：%s", fabric.ExtractErrorMessage(err))
 	}
 	var asset model.Asset
-	err = json.Unmarshal(result, &asset)
-	if err != nil {
+	if err := json.Unmarshal(result, &asset); err != nil {
 		return model.Asset{}, fmt.Errorf("解析数据失败：%s", err)
 	}
 	return asset, nil
@@ -141,4 +153,25 @@ func (s *AssetService) GetAssetStatus(id string) (int, error) {
 	}
 
 	return 0, nil
+}
+
+func (s *AssetService) DeleteAsset(id string, userID int, org int) error {
+	// 不允许删除在售/拍卖中的资产
+	status, err := s.GetAssetStatus(id)
+	if err != nil {
+		return err
+	}
+	if status != 0 {
+		return fmt.Errorf("资产处于在售或拍卖中，无法删除")
+	}
+	orgName, err := model.GetOrg(org)
+	if err != nil {
+		return fmt.Errorf("获取组织失败：%s", err)
+	}
+	contract := fabric.GetContract(orgName)
+	_, err = contract.SubmitTransaction("DeleteAsset", id, fmt.Sprintf("%d", userID), time.Now().Format(time.RFC3339))
+	if err != nil {
+		return fmt.Errorf("删除NFT失败：%s", fabric.ExtractErrorMessage(err))
+	}
+	return nil
 }

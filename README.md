@@ -77,6 +77,7 @@ cd application/server
 # 先安装初始化sql
 # 运行后端服务
 go run main.go
+（如需代理）sudo -E env STEAM_HTTP_PROXY=http://127.0.0.1:7890 go run main.go
 ```
 
 后端服务默认运行在 8888 端口。
