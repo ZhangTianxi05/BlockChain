@@ -79,14 +79,22 @@ func (h *MarketHandler) CreateListing(c *gin.Context) {
 		return
 	}
 
+	// 必填：截止时间（你要求必填），支持两种格式
 	var ddl *time.Time
-	if req.Deadline != nil && *req.Deadline != "" {
-		t, err := time.Parse(time.RFC3339, *req.Deadline)
-		if err != nil {
-			utils.BadRequest(c, "Deadline 格式应为 RFC3339")
-			return
-		}
+	if req.Deadline == nil || *req.Deadline == "" {
+		utils.BadRequest(c, "截止时间必填")
+		return
+	}
+	raw := *req.Deadline
+	if t, err := time.Parse(time.RFC3339, raw); err == nil {
 		ddl = &t
+	} else if t2, err2 := time.ParseInLocation("2006-01-02 15:04:05", raw, time.Local); err2 == nil {
+		// 统一为 UTC 存储
+		tt := t2.UTC()
+		ddl = &tt
+	} else {
+		utils.BadRequest(c, "截止时间格式错误（支持 RFC3339 或 2006-01-02 15:04:05）")
+		return
 	}
 
 	l, err := h.svc.CreateListing(userID, req.AssetID, req.Title, req.Price, ddl)
@@ -94,6 +102,7 @@ func (h *MarketHandler) CreateListing(c *gin.Context) {
 		utils.ServerError(c, "创建挂牌失败："+err.Error())
 		return
 	}
+	// 返回创建成功的完整记录（包含自增ID）
 	utils.SuccessWithMessage(c, "创建挂牌成功", l)
 }
 

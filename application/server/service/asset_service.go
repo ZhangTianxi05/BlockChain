@@ -132,26 +132,28 @@ func (s *AssetService) TransferAsset(id string, newOwnerId int, userID int, org 
 // 1: 普通出售
 // 2: 拍卖中
 func (s *AssetService) GetAssetStatus(id string) (int, error) {
-	// 查询是否有对应的 listing 是 OPEN 状态
-	now := time.Now()
+	now := time.Now().UTC()
 
-	// 普通出售：需要同时满足 OPEN 且 (deadline IS NULL 或 deadline > now)
+	// 普通出售
 	var listing model.MarketListing
-	if err := s.db.
-		Where("asset_id = ? AND status = ? AND (deadline IS NULL OR deadline > ?)",
-			id, model.ListingActive, now).
-		First(&listing).Error; err == nil {
+	err := s.db.Where("asset_id = ? AND status = ? AND (deadline IS NULL OR deadline >= ?)", id, model.ListingActive, now).
+		Order("id DESC").First(&listing).Error
+	if err == nil {
 		return 1, nil
+	}
+	if err != nil && err != gorm.ErrRecordNotFound {
+		return 0, err
 	}
 
 	// 拍卖
 	var lot model.Lot
-	if err := s.db.
-		Where("asset_id = ? AND deadline > ?", id, now).
-		First(&lot).Error; err == nil {
+	err = s.db.Where("asset_id = ? AND deadline > ?", id, now).Order("id DESC").First(&lot).Error
+	if err == nil {
 		return 2, nil
 	}
-
+	if err != nil && err != gorm.ErrRecordNotFound {
+		return 0, err
+	}
 	return 0, nil
 }
 

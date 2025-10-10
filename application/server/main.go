@@ -119,7 +119,7 @@ func main() {
 			asset.GET("/getAssetByOwnerID", assetHandler.GetAssetByOwnerID)
 			asset.POST("/transfer", assetHandler.TransferAsset)
 			asset.GET("/getStatus", assetHandler.GetAssetStatus)
-			asset.POST("/delete", assetHandler.DeleteAsset) // 新增：删除资产
+			asset.POST("/delete", assetHandler.DeleteAsset)
 		}
 
 		// 聊天相关接口（无需认证），主要是因为websocket

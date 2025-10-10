@@ -94,7 +94,7 @@ func (s *AuctionService) SubmitBid(LotID int, BidderID int, BidPrice int, Bidder
 	}
 	// 更新拍品当前价
 	lot.CurrentPrice = BidPrice
-	err = s.db.Save(lot).Error
+	err = s.db.Save(&lot).Error
 	if err != nil {
 		return fmt.Errorf("更新拍品当前价失败：%v", err)
 	}
@@ -116,7 +116,7 @@ func (s *AuctionService) SubmitBid(LotID int, BidderID int, BidPrice int, Bidder
 		return fmt.Errorf("查询出价失败：%v", err)
 	}
 	bid.BidPrice = BidPrice
-	err = s.db.Save(bid).Error
+	err = s.db.Save(&bid).Error
 	if err != nil {
 		return fmt.Errorf("更新出价失败：%v", err)
 	}

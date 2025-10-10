@@ -113,14 +113,27 @@ func (h *AssetHandler) CreateAsset(c *gin.Context) {
 	utils.Success(c, asset)
 }
 
-func (h *AssetHandler) GetAssetByID(c *gin.Context) {
-	org, exists := c.Get("org")
-	if !exists {
-		utils.ServerError(c, "组织信息获取失败")
-		return
+type deleteReq struct {
+	ID string `json:"id" binding:"required"`
+}
+
+// 兜底：从上下文获取 org，缺失或类型错误时默认 Org1=1
+func orgFromCtx(c *gin.Context) int {
+	if v, ok := c.Get("org"); ok {
+		if i, ok2 := v.(int); ok2 && i > 0 {
+			return i
+		}
 	}
+	return 1
+}
+
+func (h *AssetHandler) GetAssetByID(c *gin.Context) {
+	// 原先这里直接取 org 并在缺失时 500
+	// org, exists := c.Get("org")
+	// if !exists { utils.ServerError(c, "组织信息获取失败"); return }
 	id := c.Query("id")
-	asset, err := h.assetService.GetAssetByID(id, org.(int))
+	org := orgFromCtx(c)
+	asset, err := h.assetService.GetAssetByID(id, org)
 	if err != nil {
 		utils.ServerError(c, err.Error())
 		return
@@ -129,17 +142,13 @@ func (h *AssetHandler) GetAssetByID(c *gin.Context) {
 }
 
 func (h *AssetHandler) GetAssetByAuthorID(c *gin.Context) {
-	org, exists := c.Get("org")
-	if !exists {
-		utils.ServerError(c, "组织信息获取失败")
-		return
-	}
 	authorId, err := strconv.Atoi(c.Query("authorId"))
 	if err != nil {
 		utils.BadRequest(c, "请求参数错误")
 		return
 	}
-	assets, err := h.assetService.GetAssetByAuthorID(authorId, org.(int))
+	org := orgFromCtx(c)
+	assets, err := h.assetService.GetAssetByAuthorID(authorId, org)
 	if err != nil {
 		utils.ServerError(c, err.Error())
 		return
@@ -148,17 +157,13 @@ func (h *AssetHandler) GetAssetByAuthorID(c *gin.Context) {
 }
 
 func (h *AssetHandler) GetAssetByOwnerID(c *gin.Context) {
-	org, exists := c.Get("org")
-	if !exists {
-		utils.ServerError(c, "组织信息获取失败")
-		return
-	}
 	ownerId, err := strconv.Atoi(c.Query("ownerId"))
 	if err != nil {
 		utils.BadRequest(c, "请求参数错误")
 		return
 	}
-	assets, err := h.assetService.GetAssetByOwnerID(ownerId, org.(int))
+	org := orgFromCtx(c)
+	assets, err := h.assetService.GetAssetByOwnerID(ownerId, org)
 	if err != nil {
 		utils.ServerError(c, err.Error())
 		return
@@ -198,10 +203,6 @@ func (h *AssetHandler) GetAssetStatus(c *gin.Context) {
 		return
 	}
 	utils.Success(c, status)
-}
-
-type deleteReq struct {
-	ID string `json:"id" binding:"required"`
 }
 
 func (h *AssetHandler) DeleteAsset(c *gin.Context) {

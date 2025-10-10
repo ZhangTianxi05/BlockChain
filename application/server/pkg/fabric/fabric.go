@@ -9,6 +9,10 @@ import (
 	"path/filepath"
 	"time"
 
+	// 新增
+	"context"
+	"net"
+
 	"github.com/hyperledger/fabric-gateway/pkg/client"
 	"github.com/hyperledger/fabric-gateway/pkg/hash"
 	"github.com/hyperledger/fabric-gateway/pkg/identity"
@@ -119,7 +123,18 @@ func newGrpcConnection(orgConfig config.OrganizationConfig) (*grpc.ClientConn, e
 	certPool.AddCert(certificate)
 	transportCredentials := credentials.NewClientTLSFromCert(certPool, orgConfig.GatewayPeer)
 
-	connection, err := grpc.Dial(orgConfig.PeerEndpoint, grpc.WithTransportCredentials(transportCredentials))
+	// 关键：强制直连，不走任何代理
+	dialer := func(ctx context.Context, addr string) (net.Conn, error) {
+		d := &net.Dialer{Timeout: 10 * time.Second, KeepAlive: 30 * time.Second}
+		return d.DialContext(ctx, "tcp", addr)
+	}
+
+	connection, err := grpc.Dial(
+		orgConfig.PeerEndpoint,
+		grpc.WithTransportCredentials(transportCredentials),
+		grpc.WithContextDialer(dialer),
+		grpc.WithDisableRetry(),
+	)
 	if err != nil {
 		return nil, fmt.Errorf("创建gRPC连接失败：%w", err)
 	}

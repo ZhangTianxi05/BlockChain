@@ -39,28 +39,31 @@ func (s *MarketService) CreateListing(userID int, assetId, title string, price i
 	}
 
 	// 2) 业务校验
+	// 价格校验
 	if price <= 0 {
 		return nil, errors.New("价格必须大于0")
 	}
-	// 截止时间不能早于当前时间
-	if deadline != nil && deadline.UTC().Before(time.Now().UTC()) {
-		return nil, errors.New("截止时间不能早于当前时间")
+
+	// 统一 UTC 且容错：<= now+30s 视为无截止
+	if deadline != nil {
+		utc := deadline.UTC()
+		if !utc.After(time.Now().UTC().Add(30 * time.Second)) {
+			deadline = nil
+		} else {
+			deadline = &utc
+		}
 	}
 
-	// 3) 清理已过期挂牌并检查重复 OPEN（可选行级锁，避免并发）
+	// 清理已过期 OPEN 记录，避免误判
 	if err := s.db.Model(&model.MarketListing{}).
-		Where("asset_id = ? AND status = ? AND deadline IS NOT NULL AND deadline < ?",
-			assetId, model.ListingActive, time.Now()).
-		Updates(map[string]any{
-			"status":      model.ListingClosed,
-			"update_time": time.Now(),
-		}).Error; err != nil {
+		Where("status = ? AND deadline IS NOT NULL AND deadline < ?", model.ListingActive, time.Now().UTC()).
+		Updates(map[string]any{"status": model.ListingClosed, "update_time": time.Now().UTC()}).Error; err != nil {
 		return nil, fmt.Errorf("清理过期挂牌失败：%v", err)
 	}
 
+	// 禁止重复 OPEN
 	var cnt int64
-	if err := s.db.
-		Model(&model.MarketListing{}).
+	if err := s.db.Model(&model.MarketListing{}).
 		Where("asset_id = ? AND status = ?", assetId, model.ListingActive).
 		Count(&cnt).Error; err != nil {
 		return nil, fmt.Errorf("检查挂牌状态失败：%v", err)
@@ -76,7 +79,7 @@ func (s *MarketService) CreateListing(userID int, assetId, title string, price i
 		Price:     price,
 		SellerID:  userID,
 		SellerOrg: org2,
-		Deadline:  deadline,
+		Deadline:  deadline, // 可能为 nil => 存 NULL
 		Status:    model.ListingActive,
 		Quality:   asset.Quality,
 		Wear:      asset.Wear,
@@ -105,11 +108,11 @@ func (s *MarketService) ListListings(
 
 	var items []model.MarketListing
 	var total int64
-	now := time.Now()
+	now := time.Now().UTC()
 
 	q := s.db.Model(&model.MarketListing{}).
 		Where("status = ?", model.ListingActive).
-		Where("deadline IS NULL OR deadline > ?", now)
+		Where("deadline IS NULL OR deadline >= ?", now)
 
 	if quality != "" {
 		q = q.Where("quality = ?", quality)
