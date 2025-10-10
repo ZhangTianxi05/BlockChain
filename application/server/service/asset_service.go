@@ -134,9 +134,10 @@ func (s *AssetService) TransferAsset(id string, newOwnerId int, userID int, org 
 func (s *AssetService) GetAssetStatus(id string) (int, error) {
 	now := time.Now().UTC()
 
-	// 普通出售
+	// 普通出售（OPEN 且未过期）
 	var listing model.MarketListing
-	err := s.db.Where("asset_id = ? AND status = ? AND (deadline IS NULL OR deadline >= ?)", id, model.ListingActive, now).
+	err := s.db.
+		Where("asset_id = ? AND status = ? AND (deadline IS NULL OR deadline >= ?)", id, model.ListingActive, now).
 		Order("id DESC").First(&listing).Error
 	if err == nil {
 		return 1, nil
@@ -145,9 +146,11 @@ func (s *AssetService) GetAssetStatus(id string) (int, error) {
 		return 0, err
 	}
 
-	// 拍卖
+	// 拍卖（未到期）
 	var lot model.Lot
-	err = s.db.Where("asset_id = ? AND deadline > ?", id, now).Order("id DESC").First(&lot).Error
+	err = s.db.
+		Where("asset_id = ? AND deadline >= ?", id, now).
+		Order("id DESC").First(&lot).Error
 	if err == nil {
 		return 2, nil
 	}

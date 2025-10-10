@@ -1,8 +1,6 @@
 package model
 
-import ()
-
 const (
-	DefaultImageFolder = "public/images"
+	DefaultImageFolder = "public/default"
 	DefaultImageName   = "default.png"
 )

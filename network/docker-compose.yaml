@@ -191,8 +191,13 @@ services:
     image: hyperledger/fabric-tools:2.5.10
     tty: true
     environment:
-      - GOPROXY=https://goproxy.cn,direct
-      - CORE_PEER_ID=cli.togettoyou.com
+      GOPROXY: https://goproxy.cn,direct
+      CORE_PEER_ID: cli.togettoyou.com
+      CORE_PEER_ADDRESS: peer0.org1.togettoyou.com:7051
+      CORE_PEER_LOCALMSPID: Org1MSP
+      CORE_PEER_MSPCONFIGPATH: /etc/hyperledger/crypto-config/peerOrganizations/org1.togettoyou.com/users/Admin@org1.togettoyou.com/msp
+      CORE_PEER_TLS_ENABLED: "true"
+      CORE_PEER_TLS_ROOTCERT_FILE: /etc/hyperledger/crypto-config/peerOrganizations/org1.togettoyou.com/peers/peer0.org1.togettoyou.com/tls/ca.crt
     command: /bin/bash
     volumes:
       - ./configtx.yaml:/etc/hyperledger/configtx.yaml
